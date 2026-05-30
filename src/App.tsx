@@ -14,7 +14,7 @@ export default function App() {
   const [phase, setPhase] = useState<GamePhase>(GamePhase.MENU);
   const [success, setSuccess] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [multiplayerConfig, setMultiplayerConfig] = useState<{ roomId: string; playerId: string; initialRoom: any } | null>(null);
+  const [multiplayerConfig, setMultiplayerConfig] = useState<{ roomId: string; playerId: string; initialRoom: any; isP2PFallback?: boolean } | null>(null);
 
   const handleGameEnd = (escaped: boolean) => {
     setSuccess(escaped);
@@ -33,7 +33,7 @@ export default function App() {
     setMuted(isMuted);
   };
 
-  const handleStartGame = (config?: { roomId: string; playerId: string; initialRoom: any }) => {
+  const handleStartGame = (config?: { roomId: string; playerId: string; initialRoom: any; isP2PFallback?: boolean }) => {
     if (config) {
       setMultiplayerConfig(config);
       setPhase(GamePhase.PLAYING); // Launch directly into playing for multiplayer sync

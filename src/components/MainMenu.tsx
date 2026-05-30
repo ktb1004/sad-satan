@@ -22,9 +22,10 @@ import {
   Skull, 
   Network
 } from 'lucide-react';
+import { Peer, DataConnection } from 'peerjs';
 
 interface MainMenuProps {
-  onStartGame: (multiplayerConfig?: { roomId: string; playerId: string; initialRoom: any }) => void;
+  onStartGame: (multiplayerConfig?: { roomId: string; playerId: string; initialRoom: any; isP2PFallback?: boolean }) => void;
 }
 
 export default function MainMenu({ onStartGame }: MainMenuProps) {
@@ -48,8 +49,201 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
   // Active Lobby variables
   const [room, setRoom] = useState<any | null>(null);
   const [playerId, setPlayerId] = useState<string>('');
+  const [isP2POnly, setIsP2POnly] = useState(false);
   
   const pollingRef = useRef<any>(null);
+  const peerRef = useRef<Peer | null>(null);
+  const p2pConnectionsRef = useRef<{ [pId: string]: DataConnection }>({});
+
+  const cleanupP2PLobby = () => {
+    Object.values(p2pConnectionsRef.current).forEach((c: any) => {
+      try { c.close(); } catch (_) {}
+    });
+    p2pConnectionsRef.current = {};
+    if (peerRef.current) {
+      try { peerRef.current.destroy(); } catch (_) {}
+      peerRef.current = null;
+    }
+  };
+
+  const handleCreateLobbyP2P = (chosenUsername: string) => {
+    setIsP2POnly(true);
+    const roomCode = `SAD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newPlayerId = 'p_host_' + Math.random().toString(36).substr(2, 9);
+    
+    const SHARD_SPOTS = [
+      { x: 1.5, y: 13.5 },
+      { x: 9.5, y: 3.5 },
+      { x: 13.5, y: 11.5 },
+      { x: 7.5, y: 19.5 },
+      { x: 20.5, y: 11.5 },
+      { x: 19.5, y: 2.5 },
+      { x: 4.5, y: 16.5 },
+      { x: 16.5, y: 19.5 },
+    ];
+    const shuffled = [...SHARD_SPOTS].sort(() => 0.5 - Math.random());
+    const selectedShards = shuffled.slice(0, 5).map((spot, idx) => ({
+      id: `shard_${idx}`,
+      x: spot.x,
+      y: spot.y
+    }));
+
+    const initialRoomState = {
+      id: roomCode,
+      status: 'lobby' as const,
+      players: {
+        [newPlayerId]: {
+          id: newPlayerId,
+          username: chosenUsername,
+          x: 1.5,
+          y: 1.5,
+          angle: 0.8,
+          bob: 0,
+          fear: 0,
+          flashlightOn: true,
+          screaming: false,
+          screamerIndex: 0,
+          escaped: false,
+          lastSeen: Date.now()
+        }
+      },
+      gatheredShards: [],
+      shardPositions: selectedShards
+    };
+
+    setRoom(initialRoomState);
+    setPlayerId(newPlayerId);
+    setMenuView('lobby_room');
+
+    const peerId = `sadsatan-room-${roomCode}-host`;
+    console.log(`[P2P/Host] Registering host peer on PeerJS Cloud signaling: ${peerId}`);
+    
+    const peer = new Peer(peerId, { debug: 1 });
+    peerRef.current = peer;
+
+    peer.on('error', (err) => {
+      console.warn('[P2P/Host] PeerJS local registration notice, continuing:', err);
+    });
+
+    peer.on('connection', (conn) => {
+      console.log(`[P2P/Host] Handshake connection opened from: ${conn.peer}`);
+      
+      conn.on('open', () => {
+        setRoom((currentRoom: any) => {
+          if (currentRoom) {
+            conn.send({ type: 'lobby_update', room: currentRoom });
+          }
+          return currentRoom;
+        });
+      });
+
+      conn.on('data', (data: any) => {
+        if (!data) return;
+
+        if (data.type === 'join') {
+          const joinerId = data.playerId;
+          const joinerName = data.username;
+          
+          p2pConnectionsRef.current[joinerId] = conn;
+
+          setRoom((prev: any) => {
+            if (!prev) return prev;
+            
+            const updatedRoom = {
+              ...prev,
+              players: {
+                ...prev.players,
+                [joinerId]: {
+                  id: joinerId,
+                  username: joinerName,
+                  x: 1.5,
+                  y: 1.5,
+                  angle: 0.8,
+                  bob: 0,
+                  fear: 0,
+                  flashlightOn: true,
+                  screaming: false,
+                  screamerIndex: 0,
+                  escaped: false,
+                  lastSeen: Date.now()
+                }
+              }
+            };
+
+            // Broadcast new state to all connected client datachannels
+            Object.values(p2pConnectionsRef.current).forEach((c: any) => {
+              if (c && c.open) {
+                c.send({ type: 'lobby_update', room: updatedRoom });
+              }
+            });
+
+            return updatedRoom;
+          });
+        }
+      });
+    });
+  };
+
+  const handleJoinLobbyP2P = (chosenUsername: string, codeToJoin: string) => {
+    setIsP2POnly(true);
+    const newPlayerId = 'p_peer_' + Math.random().toString(36).substr(2, 9);
+    setPlayerId(newPlayerId);
+
+    const cleanCode = codeToJoin.trim().toUpperCase();
+    const clientPeerId = `sadsatan-room-${cleanCode}-peer-${newPlayerId}`;
+    console.log(`[P2P/Client] Connecting client peer: ${clientPeerId}`);
+
+    const peer = new Peer(clientPeerId, { debug: 1 });
+    peerRef.current = peer;
+
+    peer.on('open', () => {
+      console.log(`[P2P/Client] Peer registered. Initiating connection to Host: sadsatan-room-${cleanCode}-host`);
+      const conn = peer.connect(`sadsatan-room-${cleanCode}-host`);
+      p2pConnectionsRef.current['host'] = conn;
+
+      conn.on('open', () => {
+        console.log('[P2P/Client] WebRTC connection open. Dispatching handshake.');
+        conn.send({ type: 'join', playerId: newPlayerId, username: chosenUsername });
+      });
+
+      conn.on('data', (data: any) => {
+        if (!data) return;
+
+        if (data.type === 'lobby_update') {
+          console.log('[P2P/Client] Direct lobby update received:', data.room);
+          setRoom(data.room);
+          setMenuView('lobby_room');
+        } else if (data.type === 'start_game') {
+          console.log('[P2P/Client] Received launch start trigger from Host!');
+          cleanupP2PLobby();
+          audio.init().then(() => {
+            onStartGame({ 
+              roomId: cleanCode, 
+              playerId: newPlayerId, 
+              initialRoom: data.room,
+              isP2PFallback: true 
+            });
+          });
+        }
+      });
+
+      conn.on('close', () => {
+        console.warn('[P2P/Client] Connection closed by PeerJS host.');
+        setErrorMsg('Room Host has disconnected.');
+        setMenuView('username_setup');
+      });
+
+      conn.on('error', (err) => {
+        console.error('[P2P/Client] Peer data stream err:', err);
+        setErrorMsg('Handshake interface closed. Invalid room code.');
+      });
+    });
+
+    peer.on('error', (err) => {
+      console.warn('[P2P/Client] Signalling connection error:', err);
+      setErrorMsg('Failed to join lobby room code.');
+    });
+  };
 
   useEffect(() => {
     // Spooky slow crawling diagnostic string
@@ -70,6 +264,7 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
 
   // Poll room state while in lobby_room
   useEffect(() => {
+    if (isP2POnly) return; // Skip server sync for P2P mode
     if (menuView === 'lobby_room' && room?.id && playerId) {
       pollingRef.current = setInterval(async () => {
         try {
@@ -101,7 +296,7 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
     return () => {
       cleanupLobbyInterval();
     };
-  }, [menuView, room?.id, playerId]);
+  }, [menuView, room?.id, playerId, isP2POnly]);
 
   const cleanupLobbyInterval = () => {
     if (pollingRef.current) {
@@ -153,11 +348,17 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
         throw new Error(dataJoin.error || 'Failed to enter lobby.');
       }
 
+      setIsP2POnly(false);
       setRoom(dataJoin.room);
       setPlayerId(dataJoin.playerId);
       setMenuView('lobby_room');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Server connection failure.');
+      console.warn('[Multiplayer] Server API failed, falling back to pure P2P serverless mode:', err);
+      try {
+        handleCreateLobbyP2P(username);
+      } catch (fallbackErr: any) {
+        setErrorMsg('Failed to instantiate either Online or P2P lobby sessions.');
+      }
     } finally {
       setLoading(false);
     }
@@ -194,11 +395,17 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
         throw new Error(dataJoin.error || 'Failed to join lobby.');
       }
 
+      setIsP2POnly(false);
       setRoom(dataJoin.room);
       setPlayerId(dataJoin.playerId);
       setMenuView('lobby_room');
     } catch (err: any) {
-      setErrorMsg(err.message || 'Server join error.');
+      console.warn('[Multiplayer] API join failed, falling back to direct P2P search:', err);
+      try {
+        handleJoinLobbyP2P(username, targetRoomCode);
+      } catch (fallbackErr: any) {
+        setErrorMsg('Could not coordinate connection to code: ' + targetRoomCode);
+      }
     } finally {
       setLoading(false);
     }
@@ -207,6 +414,35 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
   const handleStartExpedition = async () => {
     if (!room) return;
     setLoading(true);
+
+    if (isP2POnly) {
+      try {
+        const updatedRoom = {
+          ...room,
+          status: 'playing' as const
+        };
+        // Broadcast start command to all connected WebRTC channels
+        Object.values(p2pConnectionsRef.current).forEach((c: any) => {
+          if (c && c.open) {
+            c.send({ type: 'start_game', room: updatedRoom });
+          }
+        });
+        cleanupP2PLobby();
+        await audio.init();
+        onStartGame({ 
+          roomId: room.id, 
+          playerId, 
+          initialRoom: updatedRoom,
+          isP2PFallback: true 
+        });
+      } catch (err) {
+        setErrorMsg('WebRTC broadcast failed.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`/api/rooms/${room.id}/start`, { method: 'POST' });
       const data = await res.json();
@@ -225,6 +461,14 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
   };
 
   const handleLeaveLobby = async () => {
+    if (isP2POnly) {
+      cleanupP2PLobby();
+      setRoom(null);
+      setPlayerId('');
+      setMenuView('username_setup');
+      return;
+    }
+
     if (room && playerId) {
       fetch(`/api/rooms/${room.id}/leave`, {
         method: 'POST',
@@ -478,6 +722,11 @@ export default function MainMenu({ onStartGame }: MainMenuProps) {
                     <span className="text-xl font-black text-neutral-200 tracking-widest font-mono">
                       {room.id}
                     </span>
+                    {isP2POnly && (
+                      <span className="block text-[8px] text-amber-500 font-bold uppercase mt-1 select-none animate-pulse">
+                        ● SERVERLESS P2P ACTIVE
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={copyRoomCode}

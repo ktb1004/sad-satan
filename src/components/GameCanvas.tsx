@@ -14,7 +14,7 @@ interface GameCanvasProps {
   onGameEnd: (success: boolean) => void;
   onTransitionPhase: (phase: GamePhase) => void;
   currentPhase: GamePhase;
-  multiplayerConfig?: { roomId: string; playerId: string; initialRoom: any } | null;
+  multiplayerConfig?: { roomId: string; playerId: string; initialRoom: any; isP2PFallback?: boolean } | null;
 }
 
 // 24x24 Map Grid representing the corridor maze
@@ -107,10 +107,40 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
 
   const handleIncomingPeerData = (opId: string, payload: any) => {
     const current = roomStateRef.current;
-    if (!current || !current.players[opId]) return;
+    if (!current) return;
+
+    // Handle P2P shard pick ups
+    if (payload && payload.type === 'claim_shard') {
+      setRoomState((prev) => {
+        if (!prev) return null;
+        if (prev.gatheredShards.includes(payload.shardId)) return prev;
+        audio.triggerWhisper();
+        return {
+          ...prev,
+          gatheredShards: [...prev.gatheredShards, payload.shardId]
+        };
+      });
+      return;
+    }
+
+    // Adapt PeerJS target peer string back to local room state identifiers if needed
+    let mappedOpId = opId;
+    if (opId.includes('sadsatan-room-')) {
+      if (opId.endsWith('-host')) {
+        const foundHost = Object.keys(current.players).find(id => id.startsWith('p_host_') || id.includes('host'));
+        mappedOpId = foundHost || opId;
+      } else {
+        const parts = opId.split('-peer-');
+        if (parts.length > 1) {
+          mappedOpId = parts[parts.length - 1];
+        }
+      }
+    }
+
+    if (!current.players[mappedOpId]) return;
 
     // Directly update ref coordinates for ultra-vibe smooth rendering update
-    const op = current.players[opId];
+    const op = current.players[mappedOpId];
     if (payload.x !== undefined) op.x = payload.x;
     if (payload.y !== undefined) op.y = payload.y;
     if (payload.angle !== undefined) op.angle = payload.angle;
@@ -135,7 +165,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
       ...current,
       players: {
         ...current.players,
-        [opId]: { ...op }
+        [mappedOpId]: { ...op }
       }
     });
   };
@@ -164,11 +194,73 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
     };
   }, []);
 
-  // Sync state loop with Server
+  // Sync state loop with Server / P2P Fallback checks
   useEffect(() => {
     if (!multiplayerConfig) return;
 
-    const { roomId, playerId } = multiplayerConfig;
+    const { roomId, playerId, isP2PFallback } = multiplayerConfig;
+
+    const getPeerJSId = (pId: string, rId: string) => {
+      if (pId.startsWith('p_host_')) {
+        return `sadsatan-room-${rId}-host`;
+      }
+      return `sadsatan-room-${rId}-peer-${pId}`;
+    };
+
+    if (isP2PFallback) {
+      const intervalId = setInterval(() => {
+        const current = roomStateRef.current;
+        if (!current) return;
+
+        // Verify and connect any unconnected full-mesh WebRTC data channels
+        Object.keys(current.players).forEach((pId) => {
+          if (pId !== playerId) {
+            const p2pPeer = peerRef.current;
+            if (p2pPeer && !p2pPeer.destroyed && !peerConnectionsRef.current[pId]) {
+              // Ensure we don't double call: lower lex playerId initiates the data channel
+              if (playerId < pId) {
+                const targetPeerId = getPeerJSId(pId, roomId);
+                console.log(`[P2P] Connecting WebRTC handshakes to peer: ${pId} (${targetPeerId})`);
+                const conn = p2pPeer.connect(targetPeerId);
+                peerConnectionsRef.current[pId] = conn;
+
+                conn.on('open', () => {
+                  console.log(`[P2P] WebRTC open with peer: ${pId}`);
+                });
+                conn.on('data', (payload: any) => {
+                  handleIncomingPeerData(pId, payload);
+                });
+                conn.on('close', () => {
+                  console.log(`[P2P] Co-op link disconnected: ${pId}`);
+                  delete peerConnectionsRef.current[pId];
+                });
+                conn.on('error', (err) => {
+                  console.warn(`[P2P] Link error with: ${pId}`, err);
+                  delete peerConnectionsRef.current[pId];
+                });
+              }
+            }
+          }
+        });
+
+        // P2P game end observer
+        const allPlayersEscapedOrFinished = Object.keys(current.players).every((id) => {
+          if (id === playerId) return hasEscapedRef.current;
+          return current.players[id].escaped;
+        });
+
+        if (allPlayersEscapedOrFinished && hasEscapedRef.current) {
+          clearInterval(intervalId);
+          audio.stopAll();
+          onGameEnd(true);
+        }
+      }, 350);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+
     const intervalId = setInterval(async () => {
       try {
         const p = playerRef.current;
@@ -258,23 +350,35 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
   useEffect(() => {
     if (!multiplayerConfig) return;
 
-    const { playerId } = multiplayerConfig;
+    const { roomId, playerId, isP2PFallback } = multiplayerConfig;
     
+    const getPeerJSId = (pId: string, rId: string) => {
+      if (pId.startsWith('p_host_')) {
+        return `sadsatan-room-${rId}-host`;
+      }
+      return `sadsatan-room-${rId}-peer-${pId}`;
+    };
+
     const isSecure = window.location.protocol === 'https:';
     const host = window.location.hostname;
     // Calculate correct signaling port dynamically
     const port = window.location.port ? parseInt(window.location.port) : (isSecure ? 443 : 80);
 
-    console.log(`[P2P/WebRTC] Initializing Peer for ${playerId} on ${host}:${port}`);
-    
-    // Create new PeerJS instance connected to local ExpressPeerServer endpoint mounted at /peerjs/myapp
-    const peer = new Peer(playerId, {
-      host: host,
-      port: port,
-      path: '/peerjs/myapp',
-      secure: isSecure,
-      debug: 1, // Only log errors
-    });
+    let peer: Peer;
+    if (isP2PFallback) {
+      const myId = getPeerJSId(playerId, roomId);
+      console.log(`[P2P/WebRTC] Initializing Serverless Decoupled Peer: ${myId}`);
+      peer = new Peer(myId, { debug: 1 });
+    } else {
+      console.log(`[P2P/WebRTC] Initializing Standard Peer for ${playerId} on ${host}:${port}`);
+      peer = new Peer(playerId, {
+        host: host,
+        port: port,
+        path: '/peerjs/myapp',
+        secure: isSecure,
+        debug: 1, // Only log errors
+      });
+    }
 
     peerRef.current = peer;
 
@@ -283,13 +387,15 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
     });
 
     peer.on('error', (err) => {
-      console.warn('[P2P/WebRTC] Peer connection notice (running fallback HTTP sync):', err);
+      console.warn('[P2P/WebRTC] Peer signaling trigger notice:', err);
     });
 
     // Accept incoming direct connections
     peer.on('connection', (conn) => {
       console.log(`[P2P/WebRTC] WebRTC connection accepted from: ${conn.peer}`);
-      peerConnectionsRef.current[conn.peer] = conn;
+      
+      const cleanPeerId = isP2PFallback ? extractPlayerIdFromPeerJS(conn.peer) : conn.peer;
+      peerConnectionsRef.current[cleanPeerId] = conn;
 
       conn.on('data', (data: any) => {
         handleIncomingPeerData(conn.peer, data);
@@ -297,14 +403,26 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
 
       conn.on('close', () => {
         console.log(`[P2P/WebRTC] WebRTC connection closed by peer: ${conn.peer}`);
-        delete peerConnectionsRef.current[conn.peer];
+        delete peerConnectionsRef.current[cleanPeerId];
       });
 
       conn.on('error', (err) => {
         console.warn(`[P2P/WebRTC] Connection channel error with ${conn.peer}:`, err);
-        delete peerConnectionsRef.current[conn.peer];
+        delete peerConnectionsRef.current[cleanPeerId];
       });
     });
+
+    const extractPlayerIdFromPeerJS = (rawId: string) => {
+      if (rawId.endsWith('-host')) {
+        const foundHost = Object.keys(roomStateRef.current?.players || {}).find(id => id.startsWith('p_host_') || id.includes('host'));
+        return foundHost || 'host';
+      }
+      const parts = rawId.split('-peer-');
+      if (parts.length > 1) {
+        return parts[parts.length - 1];
+      }
+      return rawId;
+    };
 
     // High frequency (60ms) P2P position broadcaster
     const sendInterval = setInterval(() => {
@@ -974,11 +1092,30 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
             if (dist < 0.45) {
               // Whisper trigger local alert sound & request server collection claim
               audio.triggerWhisper();
-              fetch(`/api/rooms/${currentRoom.id}/claim-shard`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shardId: shard.id })
-              }).catch(console.error);
+              
+              if (multiplayerConfig?.isP2PFallback) {
+                // Update local state directly
+                setRoomState((prev) => {
+                  if (!prev) return null;
+                  if (prev.gatheredShards.includes(shard.id)) return prev;
+                  return {
+                    ...prev,
+                    gatheredShards: [...prev.gatheredShards, shard.id]
+                  };
+                });
+                // Broadcast shard claim directly to all connected P2P peers
+                Object.values(peerConnectionsRef.current).forEach((conn: any) => {
+                  if (conn && conn.open) {
+                    conn.send({ type: 'claim_shard', shardId: shard.id });
+                  }
+                });
+              } else {
+                fetch(`/api/rooms/${currentRoom.id}/claim-shard`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ shardId: shard.id })
+                }).catch(console.error);
+              }
             }
           }
         });
