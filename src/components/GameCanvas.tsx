@@ -8,6 +8,7 @@ import { audio } from '../lib/audio';
 import { GamePhase, HorrorCue, MultiplayerRoom } from '../types';
 import { Eye, ShieldAlert, Navigation, RotateCw, Play, SkipForward, Sun, Trophy, Users } from 'lucide-react';
 import ScreamerCanvas from './ScreamerCanvas';
+import { Peer } from 'peerjs';
 
 interface GameCanvasProps {
   onGameEnd: (success: boolean) => void;
@@ -80,6 +81,16 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
   const [isPointerLocked, setIsPointerLocked] = useState(false);
   const [brightness, setBrightness] = useState(2.6); // Increased base brightness for visual clarity
   const brightnessRef = useRef(2.6);
+  const fearRef = useRef(0);
+  const flashlightOnRef = useRef(true);
+
+  useEffect(() => {
+    fearRef.current = fear;
+  }, [fear]);
+
+  useEffect(() => {
+    flashlightOnRef.current = flashlightState.strength > 0.05;
+  }, [flashlightState.strength]);
 
   // Multiplayer-specific states and refs
   const [roomState, setRoomState] = useState<MultiplayerRoom | null>(multiplayerConfig?.initialRoom || null);
@@ -90,6 +101,44 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
   const localScreamerIndexRef = useRef(0);
   const zBuffer = useRef<number[]>([]);
   const previousScreamingRef = useRef<{ [id: string]: boolean }>({});
+
+  const peerRef = useRef<Peer | null>(null);
+  const peerConnectionsRef = useRef<{ [pId: string]: any }>({});
+
+  const handleIncomingPeerData = (opId: string, payload: any) => {
+    const current = roomStateRef.current;
+    if (!current || !current.players[opId]) return;
+
+    // Directly update ref coordinates for ultra-vibe smooth rendering update
+    const op = current.players[opId];
+    if (payload.x !== undefined) op.x = payload.x;
+    if (payload.y !== undefined) op.y = payload.y;
+    if (payload.angle !== undefined) op.angle = payload.angle;
+    if (payload.bob !== undefined) op.bob = payload.bob;
+    if (payload.fear !== undefined) op.fear = payload.fear;
+    if (payload.flashlightOn !== undefined) op.flashlightOn = payload.flashlightOn;
+    
+    if (payload.screaming && !op.screaming) {
+      // Directly trigger bloodcurdling scream instantly over WebRTC!
+      audio.triggerScreech();
+      setGlitchText(`${op.username.toUpperCase()} IS SCREAMING!`);
+      setTimeout(() => setGlitchText(''), 1800);
+    }
+    
+    if (payload.screaming !== undefined) op.screaming = payload.screaming;
+    if (payload.screamerIndex !== undefined) op.screamerIndex = payload.screamerIndex;
+    if (payload.escaped !== undefined) op.escaped = payload.escaped;
+    op.lastSeen = Date.now();
+
+    // Trigger state propagation for react UI HUD alerts
+    setRoomState({
+      ...current,
+      players: {
+        ...current.players,
+        [opId]: { ...op }
+      }
+    });
+  };
 
   // Synchronise room state reference
   useEffect(() => {
@@ -158,6 +207,31 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
                 setGlitchText(`${op.username.toUpperCase()} IS SCREAMING!`);
                 setTimeout(() => setGlitchText(''), 1800);
               }
+
+              // [P2P Connection Handshake Check]
+              const p2pPeer = peerRef.current;
+              if (p2pPeer && !p2pPeer.destroyed && !peerConnectionsRef.current[pId]) {
+                if (playerId < pId) {
+                  console.log(`[P2P] Connecting WebRTC data channel with peer: ${pId}`);
+                  const conn = p2pPeer.connect(pId);
+                  peerConnectionsRef.current[pId] = conn;
+
+                  conn.on('open', () => {
+                    console.log(`[P2P] Outbound WebRTC open with: ${pId}`);
+                  });
+                  conn.on('data', (payload: any) => {
+                    handleIncomingPeerData(pId, payload);
+                  });
+                  conn.on('close', () => {
+                    console.log(`[P2P] WebRTC connection closed by peer: ${pId}`);
+                    delete peerConnectionsRef.current[pId];
+                  });
+                  conn.on('error', (err) => {
+                    console.warn(`[P2P] Connection error with peer: ${pId}`, err);
+                    delete peerConnectionsRef.current[pId];
+                  });
+                }
+              }
             }
           });
 
@@ -179,6 +253,96 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
       clearInterval(intervalId);
     };
   }, [multiplayerConfig, fear, flashlightState.strength]);
+
+  // PeerJS Client Instance Initialization & P2P High Frequency Broadcasting
+  useEffect(() => {
+    if (!multiplayerConfig) return;
+
+    const { playerId } = multiplayerConfig;
+    
+    const isSecure = window.location.protocol === 'https:';
+    const host = window.location.hostname;
+    // Calculate correct signaling port dynamically
+    const port = window.location.port ? parseInt(window.location.port) : (isSecure ? 443 : 80);
+
+    console.log(`[P2P/WebRTC] Initializing Peer for ${playerId} on ${host}:${port}`);
+    
+    // Create new PeerJS instance connected to local ExpressPeerServer endpoint mounted at /peerjs/myapp
+    const peer = new Peer(playerId, {
+      host: host,
+      port: port,
+      path: '/peerjs/myapp',
+      secure: isSecure,
+      debug: 1, // Only log errors
+    });
+
+    peerRef.current = peer;
+
+    peer.on('open', (id) => {
+      console.log(`[P2P/WebRTC] Registered successfully on signaling server as: ${id}`);
+    });
+
+    peer.on('error', (err) => {
+      console.warn('[P2P/WebRTC] Peer connection notice (running fallback HTTP sync):', err);
+    });
+
+    // Accept incoming direct connections
+    peer.on('connection', (conn) => {
+      console.log(`[P2P/WebRTC] WebRTC connection accepted from: ${conn.peer}`);
+      peerConnectionsRef.current[conn.peer] = conn;
+
+      conn.on('data', (data: any) => {
+        handleIncomingPeerData(conn.peer, data);
+      });
+
+      conn.on('close', () => {
+        console.log(`[P2P/WebRTC] WebRTC connection closed by peer: ${conn.peer}`);
+        delete peerConnectionsRef.current[conn.peer];
+      });
+
+      conn.on('error', (err) => {
+        console.warn(`[P2P/WebRTC] Connection channel error with ${conn.peer}:`, err);
+        delete peerConnectionsRef.current[conn.peer];
+      });
+    });
+
+    // High frequency (60ms) P2P position broadcaster
+    const sendInterval = setInterval(() => {
+      const p = playerRef.current;
+      if (!p || !peer || peer.destroyed) return;
+
+      const payload = {
+        x: p.x,
+        y: p.y,
+        angle: p.angle,
+        bob: p.bob,
+        fear: fearRef.current,
+        flashlightOn: flashlightOnRef.current,
+        screaming: localScreamingRef.current,
+        screamerIndex: localScreamerIndexRef.current,
+        escaped: hasEscapedRef.current,
+      };
+
+      Object.values(peerConnectionsRef.current).forEach((conn: any) => {
+        if (conn && conn.open) {
+          conn.send(payload);
+        }
+      });
+    }, 60);
+
+    return () => {
+      console.log('[P2P/WebRTC] Disposing P2P client resources on unmount');
+      clearInterval(sendInterval);
+      Object.values(peerConnectionsRef.current).forEach((conn: any) => {
+        try { conn.close(); } catch (_) {}
+      });
+      peerConnectionsRef.current = {};
+      try {
+        peer.destroy();
+      } catch (_) {}
+      peerRef.current = null;
+    };
+  }, [multiplayerConfig]);
 
   // Set up Horror Triggers
   const triggersRef = useRef<HorrorCue[]>([

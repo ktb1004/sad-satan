@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import { ExpressPeerServer } from "peer";
 
 const app = express();
 const PORT = 3000;
@@ -246,9 +247,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
+
+  const peerServer = ExpressPeerServer(server, {
+    path: "/myapp",
+    // Set allow_discovery: true if we want to query players, but since we already synced them, we don't strictly need it.
+  });
+
+  app.use("/peerjs", peerServer);
 }
 
 startServer();
