@@ -1,0 +1,6 @@
+{
+  "name": "Sad Satan Style 3D Horror Game",
+  "description": "An atmospheric first-person 3D psychological horror exploration game inspired by Sad Satan, featuring low-res grainy environments, procedural ambient soundscapes, and unsettling corridors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
