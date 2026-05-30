@@ -1364,7 +1364,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
   if (loadingAssets) {
     return (
       <div className="w-full h-screen bg-black flex flex-col items-center justify-center text-neutral-400 font-mono">
-        <div className="text-sm font-semibold animate-pulse tracking-[0.2em] mb-4">LOADING COMPREHENSIVE TEXTURES...</div>
+        <div className="text-sm font-semibold animate-pulse tracking-[0.2em] mb-4">모든 지형 텍스처 및 미로 신호 디코딩 중...</div>
         <div className="w-48 h-1 bg-neutral-900 overflow-hidden">
           <div className="h-full bg-neutral-100 w-2/3 rounded animate-[pulse_1.5s_infinite]" />
         </div>
@@ -1379,15 +1379,14 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
         <div className="absolute inset-0 pointer-events-none opacity-[0.05] bg-[size:100%_4px] bg-gradient-to-b from-white to-black z-10" />
         
         <header className="text-[10px] text-neutral-600 tracking-wider">
-          INTRO//DECRYPTING_COMMUNICATION_SEED
+          도입//통신_시드_기밀_해독_중
         </header>
 
         <main className="max-w-xl mx-auto flex-1 flex flex-col justify-center items-center text-center">
           {introStep === 0 && (
             <div className="space-y-4 animate-fade-in">
               <p className="text-sm border-l border-red-700/60 pl-4 py-2 text-left text-neutral-400 font-sans italic">
-                "There was a legend of an isolated software module uploaded onto an anonymous secure forum trace. 
-                They called it Corridor 6, or Decay. There are no visual maps, and no markers. Many turned back. Those who didn't... never described what was blockading the end."
+                "익명의 보안 포럼 자국 깊은 곳에 업로드된 외딴 소프트웨어 모듈에 대한 전설이 존재했습니다. 사람들은 이를 '6번 복도' 또는 '부패'라고 불렀습니다. 통제 지도도, 위치 표식도 없었습니다. 수많은 이들이 뒤돌아 도망쳤습니다. 그러지 못했던 이들은... 미로의 끝자락을 보았으나 그 무엇도 입 밖으로 꺼내지 못했습니다."
               </p>
             </div>
           )}
@@ -1395,11 +1394,10 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           {introStep === 1 && (
             <div className="space-y-4 animate-fade-in">
               <p className="text-sm pl-4 py-2 text-left text-neutral-400 font-sans">
-                You step inside. The air is cold and smelling of iron static. The flashlight is almost dead.
-                No compass vectors are responding.
+                당신은 한 발짝 발을 들여놓습니다. 공기는 차갑고 쇠 냄새와 무거운 정전기 음이 감돕니다. 일렁이는 손전등 배터리는 곧 꺼질 듯이 충정량이 미미하며, 나침반은 방향을 완전히 상실한 채 비정상적인 회전을 거듭하고 있습니다.
               </p>
               <div className="text-[11px] text-red-600 font-semibold tracking-wider text-center pt-4">
-                [THERE IS NO WEAPON. ONLY PURE OBSERVING.]
+                [무기는 존재하지 않습니다. 오직 회피하고, 응시하십시오.]
               </div>
             </div>
           )}
@@ -1408,14 +1406,14 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
             <div className="space-y-4 animate-fade-in">
               <h3 className="text-xs uppercase text-neutral-200 tracking-[0.2em] mb-2 font-bold flex items-center justify-center gap-2">
                 <Navigation className="w-4 h-4 text-red-800" />
-                HOW TO EXCAVATE CORRIDOR 6
+                6번 복도 안전 탐색 지침서
               </h3>
               <p className="text-xs text-neutral-500 max-w-sm mx-auto leading-relaxed text-center">
-                Press <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">W</span> / 
-                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">S</span> to Walk. 
-                Use <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">A</span> / 
-                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">D</span> to slide sideways. 
-                Drag on the screen or press Left/Right lines to Look around. Find the end black gate. Escape.
+                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">W</span> / 
+                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">S</span> 키로 전후방 걷기. 
+                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">A</span> / 
+                <span className="text-neutral-100 font-bold border border-neutral-800 px-1.5 py-0.5 rounded bg-neutral-900">D</span> 키로 좌우 슬라이딩 옆걸음질. 
+                화면을 터치 슬라이드하거나 우측 하단의 좌/우 전용 회전 햅틱 영역을 눌러 좌우 시선을 돌려 빈틈없이 살피세요. 끝자락에 연결된 칠흑의 게이트 해치를 찾아 생환하십시오.
               </p>
             </div>
           )}
@@ -1426,7 +1424,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
             onClick={handleNextIntro}
             className="px-6 py-2 border border-neutral-800 hover:border-neutral-400 text-neutral-400 hover:text-neutral-100 text-xs font-semibold tracking-widest flex items-center gap-2 uppercase transition-all duration-300 cursor-pointer"
           >
-            {introStep === 2 ? 'ENTER' : 'CONTINUE'}
+            {introStep === 2 ? '진입하기' : '계속하기'}
             <SkipForward className="w-3.5 h-3.5" />
           </button>
         </footer>
@@ -1468,7 +1466,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
       {!isPointerLocked && !loadingAssets && currentPhase === GamePhase.PLAYING && (
         <div className="absolute top-[24%] left-1/2 transform -translate-x-1/2 z-30 text-center pointer-events-none select-none animate-pulse">
           <div className="text-[10px] text-neutral-400 bg-neutral-950/85 px-4 py-2 border border-neutral-900 rounded font-bold tracking-[0.25em] uppercase shadow-2xl">
-            CLICK CORRIDOR TO MOUSE-LOOK (ESC TO WALK AWAY)
+            이곳을 클릭하여 마우스 시선을 동기화하세요 (ESC로 연결 탈착)
           </div>
         </div>
       )}
@@ -1490,7 +1488,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
         <Sun className="w-4 h-4 text-amber-500 animate-[spin_12s_linear_infinite]" />
         <div className="flex flex-col gap-1">
           <label htmlFor="brightness-slider" className="text-[9px] uppercase tracking-widest text-neutral-300 font-bold select-none flex justify-between items-center w-36">
-            <span>BRIGHTNESS (밝기)</span>
+            <span>화면 보정 밝기</span>
             <span className="text-amber-500 font-mono">x{brightness.toFixed(1)}</span>
           </label>
           <input
@@ -1516,25 +1514,25 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           <>
             <div className="text-red-500 font-bold uppercase flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 bg-red-600 rounded-full animate-ping" />
-              CO-OP CODE: {multiplayerConfig.roomId}
+              협동 세션 방 코드: {multiplayerConfig.roomId}
             </div>
-            <div className="text-neutral-500 uppercase text-[8px] mt-0.5 border-t border-neutral-900 pt-1">TEAM STATUS:</div>
+            <div className="text-neutral-500 uppercase text-[8px] mt-0.5 border-t border-neutral-900 pt-1">대원 생존 무결성:</div>
             {roomState?.players && Object.values(roomState.players).map((p: any) => (
               <div key={p.id} className="flex justify-between gap-4 text-[8px] text-neutral-300">
                 <span className="uppercase font-bold">{p.username}</span>
                 <span className={p.escaped ? "text-emerald-500 font-extrabold" : p.screaming ? "text-red-500 animate-pulse font-extrabold" : "text-neutral-500"}>
-                  {p.escaped ? "EXTRACTED" : p.screaming ? "CRITICAL!" : "STABLE"}
+                  {p.escaped ? "생환 이탈" : p.screaming ? "절대 위기!" : "인식 안정"}
                 </span>
               </div>
             ))}
           </>
         ) : (
           <>
-            <div>SIGNAL: DEGRADED</div>
-            <div>STRENGTH: {Math.max(0, 100 - Math.floor(fear * 82))}%</div>
+            <div>동기 신호: 극도로 저하됨</div>
+            <div>수신 강도: {Math.max(0, 100 - Math.floor(fear * 82))}%</div>
             <div className="flex items-center gap-1.5 mt-1">
               <span className="w-2 h-2 bg-red-750 border border-red-900 animate-ping rounded-full inline-block" />
-              <span className="text-red-500 uppercase tracking-widest">RECORDING LINE 4</span>
+              <span className="text-red-500 uppercase tracking-widest">실시간 수록 트랙 4번 라인</span>
             </div>
           </>
         )}
@@ -1544,25 +1542,25 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
         {multiplayerConfig ? (
           <>
             <div className="text-cyan-400 font-extrabold uppercase tracking-widest text-[10px]">
-              DECRYPT SHARDS: {roomState?.gatheredShards?.length || 0} / {roomState?.shardPositions?.length || 5}
+              해독된 기억의 파편: {roomState?.gatheredShards?.length || 0} / {roomState?.shardPositions?.length || 5}
             </div>
             {roomState?.gatheredShards?.length === roomState?.shardPositions?.length ? (
               <div className="text-emerald-500 font-black animate-pulse text-[8px] uppercase mt-0.5">
-                ▲ ACCESS HATCH COORDS ENTAILED (23, 21)
+                ▲ 복도 생환 출구 래치 개방 완료 (23, 21)
               </div>
             ) : (
               <div className="text-[8px] text-neutral-500 uppercase mt-0.5">
-                COLLECT ALL GLOWING SPKF SOURCES
+                방황하는 모든 백색 발광 기억 파편을 회수하십시오
               </div>
             )}
             <div className="text-[8px] text-neutral-500 font-mono mt-1 pt-1 border-t border-neutral-900">
-              POS: X_{Math.floor(playerRef.current.x)} / Y_{Math.floor(playerRef.current.y)}
+              현재 현장 좌표: X_{Math.floor(playerRef.current.x)} / Y_{Math.floor(playerRef.current.y)}
             </div>
           </>
         ) : (
           <>
-            <div>LOCAL SEED: 0x93FF</div>
-            <div>COORDINATES: X_{Math.floor(playerRef.current.x)} / Y_{Math.floor(playerRef.current.y)}</div>
+            <div>로컬 고유 시드코드: 0x93FF</div>
+            <div>동기화 영역 위치 좌표: X_{Math.floor(playerRef.current.x)} / Y_{Math.floor(playerRef.current.y)}</div>
             <div className="text-[8px] text-neutral-500 font-mono mt-1">SAD_SATAN_DECRYPTED</div>
           </>
         )}
@@ -1623,7 +1621,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           className="w-11 h-11 bg-neutral-900/80 active:bg-neutral-100 hover:bg-neutral-800 active:text-neutral-950 text-neutral-300 border border-neutral-800 rounded flex flex-col items-center justify-center font-extrabold text-[10px] cursor-pointer focus:outline-none"
         >
           <RotateCw className="w-3.5 h-3.5 scale-x-[-1] mb-0.5" />
-          LOOK L
+          좌측 시야
         </button>
         <button
           onMouseDown={() => handleVirtualNav('right', true)}
@@ -1633,7 +1631,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           className="w-11 h-11 bg-neutral-900/80 active:bg-neutral-100 hover:bg-neutral-800 active:text-neutral-950 text-neutral-300 border border-neutral-800 rounded flex flex-col items-center justify-center font-extrabold text-[10px] cursor-pointer focus:outline-none"
         >
           <RotateCw className="w-3.5 h-3.5 mb-0.5" />
-          LOOK R
+          우측 시야
         </button>
       </div>
 
@@ -1648,22 +1646,22 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           </div>
           
           <h2 className="text-lg font-black tracking-[0.3em] uppercase text-emerald-500 mb-2">
-            INTEGRITY TRANSMITTED
+            신호 생환 복원 완료
           </h2>
-          <p className="text-xs text-neutral-400 max-w-sm mb-6 leading-relaxed uppercase tracking-widest text-[10px]">
-            You have successfully escaped Corridor Sector-B6. Wait for remaining survivors to decrypt and extract...
+          <p className="text-xs text-neutral-400 max-w-sm mb-6 leading-relaxed text-[10px] uppercase tracking-widest leading-relaxed">
+            축하합니다. 신속하게 탈출 전선 Sector-B6를 무사 복원하여 이탈 완료하였습니다. 아직 어둠을 배회하는 생존 대원들의 수집을 대조할 수 있도록 잠시 핸드셰이크 링크 상태를 유지해 주십시오...
           </p>
 
           <div className="w-full max-w-xs bg-neutral-900/40 border border-neutral-900 p-4 rounded text-left">
-            <span className="block text-[9px] text-neutral-500 tracking-widest uppercase mb-3 border-b border-neutral-950 pb-1.5">
-              TEAM EXTRACTION STATUS
+            <span className="block text-[9px] text-neutral-500 tracking-widest uppercase mb-3 border-b border-neutral-950 pb-1.5 font-bold">
+              전원 이탈 생환 스펙트럼
             </span>
             <div className="space-y-2">
               {roomState?.players && Object.values(roomState.players).map((p: any) => (
                 <div key={p.id} className="flex justify-between items-center text-xs">
                   <span className="uppercase text-neutral-200 font-bold">{p.username}</span>
                   <span className={p.escaped ? "text-emerald-500 font-extrabold" : p.screaming ? "text-red-500 font-black animate-pulse" : "text-amber-500 font-bold"}>
-                    {p.escaped ? "EXTRACTED" : p.screaming ? "CRITICAL OUTCRY!" : "IN CORRIDOR"}
+                    {p.escaped ? "생환 이탈됨" : p.screaming ? "절규 발포 상태!" : "복도 수탐 중"}
                   </span>
                 </div>
               ))}
@@ -1671,7 +1669,7 @@ export default function GameCanvas({ onGameEnd, onTransitionPhase, currentPhase,
           </div>
           
           <div className="text-[8px] text-neutral-600 tracking-widest mt-8 uppercase select-none animate-pulse">
-            DO NOT LEAVE ANY SOUL ALONE · S▲T▲N_DEC▲Y v1.0.6
+            그 누구도 홀로 외로이 어둠 속에 내버려두지 마라 · S▲T▲N_DEC▲Y v1.0.6
           </div>
         </div>
       )}

@@ -3,22 +3,36 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export interface PlayerState {
-  x: number;
-  y: number;
-  angle: number; // in radians
-  health: number;
-  fear: number; // 0 to 1 scaling, drives screen distortion & heartbeat speed
-  isMoving: boolean;
-  stepsCount: number;
-}
-
 export enum GamePhase {
   MENU = 'MENU',
   INTRO = 'INTRO',
+  LOBBY = 'LOBBY',
   PLAYING = 'PLAYING',
   GLITCH_SCREEN = 'GLITCH_SCREEN',
   ENDING = 'ENDING'
+}
+
+export enum UserRole {
+  HOST = 'HOST',       // Teacher / Director
+  CLIENT = 'CLIENT'    // Student / Explorer
+}
+
+export interface StudentState {
+  id: string;
+  username: string;
+  x: number;
+  y: number;
+  angle: number;
+  bob: number;
+  fear: number;        // On-screen anxiety (0 to 100)
+  flashlightOn: boolean;
+  flashlightBattery: number; // 0 to 100
+  screaming: boolean;
+  screamerIndex: number;
+  escaped: boolean;
+  health: number;      // 0 to 100
+  stepsCount: number;
+  lastSeen: number;
 }
 
 export interface HorrorCue {
@@ -26,44 +40,33 @@ export interface HorrorCue {
   y: number;
   type: 'glitch' | 'whisper' | 'flash_face' | 'flash_figure' | 'heavy_rumble';
   triggered: boolean;
-  cooldown?: number; // timestamp
 }
 
-export interface RaycastResult {
-  distance: number;
-  wallX: number; // position on wall for texture coordinate checking (0 to 1)
-  textureId: number;
-  side: 0 | 1; // 0 = vertical wall, 1 = horizontal wall
-  cellX: number;
-  cellY: number;
-}
-
-export interface MultiplayerPlayer {
-  id: string;
-  username: string;
-  x: number;
-  y: number;
-  angle: number;
-  bob: number;
-  fear: number;
-  flashlightOn: boolean;
-  screaming: boolean;
-  screamerIndex: number;
-  escaped: boolean;
-  lastSeen: number;
-}
-
-export interface Shard {
+export interface MemoryShard {
   id: string;
   x: number;
   y: number;
+  claimedBy: string | null; // Id of student who found it
 }
 
-export interface MultiplayerRoom {
+export interface GameRoomState {
   id: string;
+  peers: { [playerId: string]: StudentState };
+  shards: MemoryShard[];
+  systemAnnouncement: string;
+  hostId: string;
   status: 'lobby' | 'playing' | 'ended';
-  players: { [id: string]: MultiplayerPlayer };
-  gatheredShards: string[];
-  shardPositions: Shard[];
+  timestamp: number;
 }
 
+export interface PeerMessage {
+  type: 'handshake' | 'state_update' | 'host_state_broadcast' | 'trigger_jumpscare' | 'trigger_flicker' | 'system_shock' | 'claim_shard' | 'student_screamed' | 'start_game';
+  senderId: string;
+  senderName: string;
+  payload: any;
+}
+
+// Aliases for compatibility with GameCanvas engine
+export type MultiplayerRoom = GameRoomState;
+export type MultiplayerPlayer = StudentState;
+export type Shard = MemoryShard;
